@@ -1,15 +1,19 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Tasks;
+using System.Numerics;
 
 namespace RSA
 {
     public class ViewModel : INotifyPropertyChanged
     {
+        private const int N = 1024; // bits count to generate random primes
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         private void OnPropertyChanged<T>(Expression<Func<T>> expr)
@@ -20,9 +24,32 @@ namespace RSA
         public ViewModel()
         {
             var r = IsPrime(7451, 128);
+            GetRandomPrime();
         }
 
-        private bool IsPrime(int num, int accuracy)
+        private void GetRandomPrime()
+        {
+            var k = N / 2;
+            BigInteger num = 0;
+
+            do
+            {
+                var rand = new Random();
+                var bits = new BitArray(k);
+
+                string str = "";
+
+                for (int i = 0; i < k; i++)
+                {
+                    str += Convert.ToBoolean(rand.Next(0, 2)) ? "1" : "0";
+                }
+
+                num = BinToDec(str);
+            }
+            while (!IsPrime(num, 128));
+        }
+
+        private bool IsPrime(BigInteger num, int accuracy)
         {
             if (num % 2 == 0) return false;
 
@@ -36,7 +63,7 @@ namespace RSA
             return true;
         }
 
-        private int GetDNumber(int n)
+        private BigInteger GetDNumber(BigInteger n)
         {
             var d = n - 1;
 
@@ -51,12 +78,9 @@ namespace RSA
         /// <param name="n">number to test</param>
         /// <param name="d">a number that d*2^r = n-1</param>
         /// <returns></returns>
-        private bool MillerTest(int n, int d)
+        private bool MillerTest(BigInteger n, BigInteger d)
         {
-            var @enum = Enumerable.Range(2, n - 2);
-
-            // getting random number from enumeration
-            var test = @enum.ElementAt(new Random().Next(0, @enum.Count()));
+            var test = RandomBigInteger(n);
 
             var pow = ModularPower(test, d, n);
 
@@ -74,9 +98,9 @@ namespace RSA
             return false; // number is composite
         }
 
-        private int ModularPower(int x, int y, int n)
+        private BigInteger ModularPower(BigInteger x, BigInteger y, BigInteger n)
         {
-            var res = 1;
+            BigInteger res = 1;
 
             // making the x be less then n
             x %= n;
@@ -84,7 +108,7 @@ namespace RSA
             while(y > 0)
             {
                 // if y is odd, multiply x with result
-                if((y & 1) == 1)
+                if((y & 1L) == 1)
                 {
                     res = (res * x) % n;
                 }
@@ -97,5 +121,35 @@ namespace RSA
             return res;
         }
 
+        public static BigInteger RandomBigInteger(BigInteger max)
+        {
+            var random = new Random();
+            byte[] bytes = max.ToByteArray();
+            BigInteger R;
+
+            do
+            {
+                random.NextBytes(bytes);
+                bytes[bytes.Length - 1] &= 0x7F; //force sign bit to positive
+                R = new BigInteger(bytes);
+            } while (!(R >=2 && R <= max));
+
+            return R;
+        }
+
+        public BigInteger BinToDec(string value)
+        {
+            // BigInteger can be found in the System.Numerics dll
+            BigInteger res = 0;
+
+            // I'm totally skipping error handling here
+            foreach (char c in value)
+            {
+                res <<= 1;
+                res += c == '1' ? 1 : 0;
+            }
+
+            return res;
+        }
     }
 }

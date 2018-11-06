@@ -19,7 +19,7 @@ namespace RSA
 
         public ViewModel()
         {
-
+            var r = IsPrime(7451, 128);
         }
 
         private bool IsPrime(int num, int accuracy)
@@ -65,6 +65,7 @@ namespace RSA
             while(d != n - 1)
             {
                 pow = (pow * pow) % n;
+                d = d << 1;
 
                 if (pow == 1) return false;
                 if (pow == n - 1) return true;

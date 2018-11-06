@@ -23,6 +23,7 @@ namespace RSA
         public MainWindow()
         {
             InitializeComponent();
+            DataContext = new ViewModel();
         }
     }
 }

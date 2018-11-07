@@ -17,14 +17,11 @@ namespace RSA
     public class ViewModel : INotifyPropertyChanged
     {
         private const int N = 1024, // bits count to generate random primes
-            e = 65537, // 3, 5, 17, 257 are common choices too
             accuracy = 128;
-
-        private readonly int[] earr = { 3, 5, 17, 257, 65537 };
 
         private string _publicKey, _privateKey, _message;
         private byte[] _encryptedMessage;
-        private BigInteger _primeFirst, _primeSecond, n, c, d, m;
+        private BigInteger _primeFirst, _primeSecond, n, c, d, m, e;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -49,8 +46,8 @@ namespace RSA
             Clipboard.SetText(x.ToString() == "1" ? PublicKey : PrivateKey);
         });
 
-        public ICommand EncryptSessionKeyCommand => new RelayCommand(delegate 
-        { 
+        public ICommand EncryptSessionKeyCommand => new RelayCommand(delegate
+        {
             var PS = GetRandomHexNumber(128 - 16 - 3);
             var EB = $"0002{PS}00{SessionKey}";
             m = BigInteger.Parse(EB, System.Globalization.NumberStyles.AllowHexSpecifier);
@@ -65,7 +62,7 @@ namespace RSA
             var byteIV = Enumerable.Range(0, IV.Length / 2).Select(x => Convert.ToByte(IV.Substring(x * 2, 2), 16)).ToArray();
 
             var decrSessionMessage = ModularPower(
-                BigInteger.Parse(EncryptedSessionKey, System.Globalization.NumberStyles.AllowHexSpecifier), 
+                BigInteger.Parse(EncryptedSessionKey, System.Globalization.NumberStyles.AllowHexSpecifier),
                 d, n);
             var decrSessionKey = decrSessionMessage.ToString("X2");
             decrSessionKey = decrSessionKey.Substring(decrSessionKey.Length - 32);
@@ -83,7 +80,7 @@ namespace RSA
                 var byteIV = Enumerable.Range(0, IV.Length / 2).Select(x => Convert.ToByte(IV.Substring(x * 2, 2), 16)).ToArray();
                 EncryptedMessage = Decrypt(_encryptedMessage, byteKey, byteIV);
             }
-            catch(Exception)
+            catch (Exception)
             {
                 MessageBox.Show("Error occured. Message can't be decrypted", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -125,6 +122,8 @@ namespace RSA
             set
             {
                 _privateKey = value;
+                var parts = value.Split(',');
+                d = BigInteger.Parse(parts[0]); n = BigInteger.Parse(parts[1]);
                 OnPropertyChanged(() => PrivateKey);
             }
         }
@@ -146,7 +145,7 @@ namespace RSA
                 {
                     _primeFirst = val;
 
-                    if(_primeSecond != 0) RecalculateParams();
+                    if (_primeSecond != 0) RecalculateParams();
                     OnPropertyChanged(() => PublicKey);
                 }
                 else
@@ -200,45 +199,17 @@ namespace RSA
                 return;
             }
 
-            ExtendedEuclidianAlgorithm(earr.Last(x => x < EulerFunc), EulerFunc, out d, out var ignore);
+            ExtendedEuclidianAlgorithm(e, EulerFunc, out d, out var ignore);
 
             PublicKey = $"{e}, {n}";
-            PrivateKey = $"{e}, {d}";
+            PrivateKey = $"{d}, {n}";
         }
 
         public ViewModel()
         {
             SessionKey = GetRandomHexNumber(16);
             IV = GetRandomHexNumber(16);
-            return;
-
-            //var r = IsPrime(7451, 128);
-            var pq = new BigInteger[] { GetRandomPrime(), GetRandomPrime() };
-            var n = 1; var d = 1;
-            //{e,n} - public key
-            //{d,n} - private key
-
-            var D = "4E636AF98E40F3ADCFCCB698F4E80B9F";
-            var PS = GetRandomHexNumber(128 - 16 - 3);
-            var EB = $"0002{PS}00{D}";
-            var m = BigInteger.Parse(EB, System.Globalization.NumberStyles.AllowHexSpecifier);
-            var c = ModularPower(m, e, n);
-            var OB = c.ToString("X"); // encrypted session key
-
-            var mes = "Hello world!";
-            byte[] ba = Encoding.Default.GetBytes(mes);
-            var hexstring = BitConverter.ToString(ba).Replace("-", "");
-
-            var K = "5732164B3ABB6C4969ABA381C1CA75BA";
-            var byteKey = Enumerable.Range(0, D.Length / 2).Select(x => Convert.ToByte(D.Substring(x * 2, 2), 16)).ToArray();
-            var byteIV = Enumerable.Range(0, K.Length / 2).Select(x => Convert.ToByte(K.Substring(x * 2, 2), 16)).ToArray();
-
-            var decrSessionKey = ModularPower(c, d, n);
-            var parts = decrSessionKey.ToString("X2").Split(new string[] { "00" }, StringSplitOptions.None);
-            var byteSession = Enumerable.Range(0, parts.Last().Length / 2).Select(x => Convert.ToByte(parts.Last().Substring(x * 2, 2), 16)).ToArray();
-            var encr = Encrypt(mes, byteSession, byteIV);
-
-            var decr = Decrypt(encr, byteKey, byteIV);
+            e = 65537;
         }
 
         private BigInteger GetRandomPrime()
@@ -302,7 +273,7 @@ namespace RSA
         /// <returns></returns>
         private bool MillerTest(BigInteger n, BigInteger d)
         {
-            var test = RandomBigInteger(n);
+            var test = RandomBigInteger(n-2);
 
             var pow = ModularPower(test, d, n);
 
@@ -411,7 +382,7 @@ namespace RSA
                 y2 = y1; y1 = y;
             }
 
-            x = x2 > 0 ? x2 : x2 + n; y = y2; // d = a
+            x = x2 > 0 ? x2 : x2 + n; y = y2;
             return a;
         }
 

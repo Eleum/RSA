@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:RSA"
         mc:Ignorable="d"
-        Title="RSA" Height="350" Width="700"
+        Title="RSA" Height="300" Width="700"
         WindowStartupLocation="CenterScreen">
     <Grid Background="#c3ccdb">
         <Grid.ColumnDefinitions>
@@ -40,7 +40,7 @@
                     </StackPanel>
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Private Key" Margin="0,0,6,0"/>
-                        <TextBox x:Name="PrivateKey" Text="{Binding PrivateKey, FallbackValue='{}{1, 2}', Mode=TwoWay}" Width="83" LostFocus="PublicKey_LostFocus" IsReadOnly="True" IsReadOnlyCaretVisible="False">
+                        <TextBox x:Name="PrivateKey" Text="{Binding PrivateKey, FallbackValue='{}{1, 2}', Mode=TwoWay}" Width="83" LostFocus="PublicKey_LostFocus" IsReadOnly="False" IsReadOnlyCaretVisible="False">
                             <TextBox.ContextMenu>
                                 <ContextMenu>
                                     <MenuItem Header="Copy" Command="{Binding CopyValueCommand}" CommandParameter="2" />
@@ -66,7 +66,7 @@
                 <TextBlock Margin="18,0,0,0" Text="{Binding IV, StringFormat='IV = {0}'}" HorizontalAlignment="Left" />
                 <TextBox HorizontalAlignment="Center" Margin="0,0,0,15" Height="100" Width="230" 
                          Text="{Binding Message, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
-                <TextBox HorizontalAlignment="Center" Margin="0,0,0,15" Height="25" Width="230" Text="{Binding EncryptedSessionKey}" />
+                <TextBox x:Name="EncryptedSessionKey" HorizontalAlignment="Center" Margin="0,0,0,15" Height="25" Width="230" Text="{Binding EncryptedSessionKey}" LostFocus="PublicKey_LostFocus"/>
                 <Button Margin="0,0,0,5" HorizontalAlignment="Center" Content="Encrypt and send message" Command="{Binding EncryptMessageCommand}"/>
             </StackPanel>
         </Grid>

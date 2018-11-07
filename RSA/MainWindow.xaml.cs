@@ -32,6 +32,7 @@ namespace RSA
             PrivateKey.CaretIndex = 0;
             FirstPrime.CaretIndex = 0;
             SecondPrime.CaretIndex = 0;
+            EncryptedSessionKey.CaretIndex = 0;
         }
     }
 }

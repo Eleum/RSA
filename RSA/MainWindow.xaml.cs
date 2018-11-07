@@ -25,5 +25,13 @@ namespace RSA
             InitializeComponent();
             DataContext = new ViewModel();
         }
+
+        private void PublicKey_LostFocus(object sender, RoutedEventArgs e)
+        {
+            PublicKey.CaretIndex = 0;
+            PrivateKey.CaretIndex = 0;
+            FirstPrime.CaretIndex = 0;
+            SecondPrime.CaretIndex = 0;
+        }
     }
 }

@@ -9,30 +9,212 @@ using System.Threading.Tasks;
 using System.Numerics;
 using System.Security.Cryptography;
 using System.IO;
+using System.Windows;
+using System.Windows.Input;
 
 namespace RSA
 {
     public class ViewModel : INotifyPropertyChanged
     {
         private const int N = 1024, // bits count to generate random primes
-            e = 65537; // 3, 5, 17, 257 are common choices too
+            e = 65537, // 3, 5, 17, 257 are common choices too
+            accuracy = 128;
+
+        private readonly int[] earr = { 3, 5, 17, 257, 65537 };
+
+        private string _publicKey, _privateKey, _message;
+        private byte[] _encryptedMessage;
+        private BigInteger _primeFirst, _primeSecond, n, c, d, m;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
         private void OnPropertyChanged<T>(Expression<Func<T>> expr)
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(expr.GetType().ToString()));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(((MemberExpression)expr.Body).Member.Name));
+        }
+
+        public ICommand GenerateRandomCommand => new RelayCommand(x =>
+        {
+            _primeFirst = GetRandomPrime();
+            _primeSecond = GetRandomPrime();
+
+            OnPropertyChanged(() => PrimeFirst);
+            OnPropertyChanged(() => PrimeSecond);
+
+            RecalculateParams();
+        });
+
+        public ICommand CopyValueCommand => new RelayCommand(x =>
+        {
+            Clipboard.SetText(x.ToString() == "1" ? PublicKey : PrivateKey);
+        });
+
+        public ICommand EncryptSessionKeyCommand => new RelayCommand(delegate 
+        { 
+            var PS = GetRandomHexNumber(128 - 16 - 3);
+            var EB = $"0002{PS}00{SessionKey}";
+            m = BigInteger.Parse(EB, System.Globalization.NumberStyles.AllowHexSpecifier);
+            c = ModularPower(m, e, n);
+
+            EncryptedSessionKey = c.ToString("X");
+            OnPropertyChanged(() => EncryptedSessionKey);
+        }, new Predicate<object>(_ => n != 0));
+
+        public ICommand EncryptMessageCommand => new RelayCommand(delegate
+        {
+            var byteIV = Enumerable.Range(0, IV.Length / 2).Select(x => Convert.ToByte(IV.Substring(x * 2, 2), 16)).ToArray();
+
+            var decrSessionMessage = ModularPower(
+                BigInteger.Parse(EncryptedSessionKey, System.Globalization.NumberStyles.AllowHexSpecifier), 
+                d, n);
+            var decrSessionKey = decrSessionMessage.ToString("X2");
+            decrSessionKey = decrSessionKey.Substring(decrSessionKey.Length - 32);
+
+            var byteSession = Enumerable.Range(0, decrSessionKey.Length / 2).Select(x => Convert.ToByte(decrSessionKey.Substring(x * 2, 2), 16)).ToArray();
+            _encryptedMessage = Encrypt(Message, byteSession, byteIV);
+            OnPropertyChanged(() => EncryptedMessage);
+        }, new Predicate<object>(_ => !string.IsNullOrWhiteSpace(Message)));
+
+        public ICommand DecryptMessageCommand => new RelayCommand(delegate
+        {
+            try
+            {
+                var byteKey = Enumerable.Range(0, SessionKey.Length / 2).Select(x => Convert.ToByte(SessionKey.Substring(x * 2, 2), 16)).ToArray();
+                var byteIV = Enumerable.Range(0, IV.Length / 2).Select(x => Convert.ToByte(IV.Substring(x * 2, 2), 16)).ToArray();
+                EncryptedMessage = Decrypt(_encryptedMessage, byteKey, byteIV);
+            }
+            catch(Exception)
+            {
+                MessageBox.Show("Error occured. Message can't be decrypted", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }, new Predicate<object>(_ => !string.IsNullOrWhiteSpace(EncryptedMessage)));
+
+        public string Message
+        {
+            get { return _message; }
+            set
+            {
+                _message = value;
+                OnPropertyChanged(() => Message);
+            }
+        }
+
+        public string EncryptedMessage
+        {
+            get { return _encryptedMessage == null ? "" : Encoding.Default.GetString(_encryptedMessage); }
+            set
+            {
+                _encryptedMessage = Encoding.ASCII.GetBytes(value);
+                OnPropertyChanged(() => EncryptedMessage);
+            }
+        }
+
+        public string PublicKey
+        {
+            get { return _publicKey; }
+            set
+            {
+                _publicKey = value;
+                OnPropertyChanged(() => PublicKey);
+            }
+        }
+
+        public string PrivateKey
+        {
+            get { return _privateKey; }
+            set
+            {
+                _privateKey = value;
+                OnPropertyChanged(() => PrivateKey);
+            }
+        }
+
+        public string PrimeFirst
+        {
+            get { return _primeFirst.ToString(); }
+            set
+            {
+                var val = BigInteger.Parse(value);
+
+                if (val == 0)
+                {
+                    MessageBox.Show("Choose a non-zero value", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                };
+
+                if (IsPrime(val, accuracy))
+                {
+                    _primeFirst = val;
+
+                    if(_primeSecond != 0) RecalculateParams();
+                    OnPropertyChanged(() => PublicKey);
+                }
+                else
+                {
+                    MessageBox.Show($"Value {val} is not prime", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+        }
+
+        public string PrimeSecond
+        {
+            get { return _primeSecond.ToString(); }
+            set
+            {
+                var val = BigInteger.Parse(value);
+
+                if (val == 0)
+                {
+                    MessageBox.Show("Choose a non-zero value", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                };
+
+                if (IsPrime(val, accuracy))
+                {
+                    _primeSecond = val;
+
+                    if (_primeFirst != 0) RecalculateParams();
+                    OnPropertyChanged(() => PublicKey);
+                }
+                else
+                {
+                    MessageBox.Show($"Value {val} is not prime", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+        }
+
+        public string SessionKey { get; set; }
+
+        public string EncryptedSessionKey { get; set; }
+
+        public string IV { get; set; }
+
+        private void RecalculateParams()
+        {
+            n = _primeFirst * _primeSecond;
+            var EulerFunc = (_primeFirst - 1) * (_primeSecond - 1);
+
+            if (EulerFunc == 0)
+            {
+                MessageBox.Show("Some value is too small", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            ExtendedEuclidianAlgorithm(earr.Last(x => x < EulerFunc), EulerFunc, out d, out var ignore);
+
+            PublicKey = $"{e}, {n}";
+            PrivateKey = $"{e}, {d}";
         }
 
         public ViewModel()
         {
+            SessionKey = GetRandomHexNumber(16);
+            IV = GetRandomHexNumber(16);
+            return;
+
             //var r = IsPrime(7451, 128);
             var pq = new BigInteger[] { GetRandomPrime(), GetRandomPrime() };
-
-            var n = pq[0] * pq[1];
-            var EulerFunc = (pq[0] - 1) * (pq[1] - 1);
-            ExtendedEuclidianAlgorithm(e, EulerFunc, out var d, out var ignore);
-        
+            var n = 1; var d = 1;
             //{e,n} - public key
             //{d,n} - private key
 
@@ -83,13 +265,14 @@ namespace RSA
                 num += 2;
             }
             // last part of condition is less-expensive test of gcd(num-1, e) == 1, coz e is odd prime
-            while (!IsPrime(num, 128) && (num % e != 1)); 
+            while (!IsPrime(num, 128) && (num % e != 1));
 
             return num;
         }
 
         private bool IsPrime(BigInteger num, int accuracy)
         {
+            if (num == 1 || num == 2 || num == 3) return true;
             if (num % 2 == 0) return false;
 
             var d = GetDNumber(num);
@@ -192,7 +375,7 @@ namespace RSA
 
         private BigInteger GetGCD(BigInteger a, BigInteger b)
         {
-            while(b > 0)
+            while (b > 0)
             {
                 var r = a % b;
                 a = b;
@@ -216,7 +399,7 @@ namespace RSA
             BigInteger x1 = 0, x2 = 1,
                 y1 = 1, y2 = 0;
 
-            while(b > 0)
+            while (b > 0)
             {
                 var q = BigInteger.Divide(a, b);
                 var r = a - q * b;

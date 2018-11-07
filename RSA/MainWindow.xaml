@@ -5,8 +5,70 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:RSA"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
-        
+        Title="RSA" Height="350" Width="700"
+        WindowStartupLocation="CenterScreen">
+    <Grid Background="#c3ccdb">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition />
+        </Grid.ColumnDefinitions>
+        <StackPanel Margin="5,0,0,0" Grid.Column="0">
+            <GroupBox Header="Prime Numbers">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,5,0,10">
+                        <TextBlock Text="First prime" Margin="0,0,21,0"/>
+                        <TextBox x:Name="FirstPrime" Text="{Binding PrimeFirst, Mode=TwoWay}" Width="70" LostFocus="PublicKey_LostFocus"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Second prime" Margin="0,0,4,0"/>
+                        <TextBox x:Name="SecondPrime" Text="{Binding PrimeSecond, Mode=TwoWay}" Width="70" LostFocus="PublicKey_LostFocus"/>
+                    </StackPanel>
+                    <Button Margin="0,5,0,0" Content="Generate random" Command="{Binding GenerateRandomCommand}" />
+                </StackPanel>
+            </GroupBox>
+            <GroupBox Header="Keys">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,5,0,10">
+                        <TextBlock Text="Public Key" Margin="0,0,10,0"/>
+                        <TextBox x:Name="PublicKey" Text="{Binding PublicKey, FallbackValue='{}{1, 2}', Mode=TwoWay}" Width="83" LostFocus="PublicKey_LostFocus" IsReadOnly="True" IsReadOnlyCaretVisible="True">
+                            <TextBox.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Copy" Command="{Binding CopyValueCommand}" CommandParameter="1" />
+                                </ContextMenu>
+                            </TextBox.ContextMenu>
+                        </TextBox>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Private Key" Margin="0,0,6,0"/>
+                        <TextBox x:Name="PrivateKey" Text="{Binding PrivateKey, FallbackValue='{}{1, 2}', Mode=TwoWay}" Width="83" LostFocus="PublicKey_LostFocus" IsReadOnly="True" IsReadOnlyCaretVisible="False">
+                            <TextBox.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Copy" Command="{Binding CopyValueCommand}" CommandParameter="2" />
+                                </ContextMenu>
+                            </TextBox.ContextMenu>
+                        </TextBox>
+                    </StackPanel>
+                </StackPanel>
+            </GroupBox>
+        </StackPanel>
+        <Grid Grid.Column="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                <TextBox HorizontalAlignment="Center" Margin="0,0,0,15" Height="100" Width="230" Text="{Binding EncryptedMessage}" />
+                <TextBox HorizontalAlignment="Center" Margin="0,0,0,15" Height="25" Width="230" IsReadOnly="True" Text="{Binding SessionKey}" />
+                <Button Margin="0,0,0,5" HorizontalAlignment="Center" Content="Encrypt and send session key" Command="{Binding EncryptSessionKeyCommand}"/>
+                <Button HorizontalAlignment="Center" Content="Decrypt message" Command="{Binding DecryptMessageCommand}"/>
+            </StackPanel>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,-36,0,0">
+                <TextBlock Margin="18,0,0,0" Text="{Binding IV, StringFormat='IV = {0}'}" HorizontalAlignment="Left" />
+                <TextBox HorizontalAlignment="Center" Margin="0,0,0,15" Height="100" Width="230" 
+                         Text="{Binding Message, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+                <TextBox HorizontalAlignment="Center" Margin="0,0,0,15" Height="25" Width="230" Text="{Binding EncryptedSessionKey}" />
+                <Button Margin="0,0,0,5" HorizontalAlignment="Center" Content="Encrypt and send message" Command="{Binding EncryptMessageCommand}"/>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>

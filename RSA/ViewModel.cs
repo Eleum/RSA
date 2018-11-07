@@ -7,6 +7,8 @@ using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Tasks;
 using System.Numerics;
+using System.Security.Cryptography;
+using System.IO;
 
 namespace RSA
 {
@@ -29,10 +31,32 @@ namespace RSA
 
             var n = pq[0] * pq[1];
             var EulerFunc = (pq[0] - 1) * (pq[1] - 1);
-
-            //{e,n} - public key
-
             ExtendedEuclidianAlgorithm(e, EulerFunc, out var d, out var ignore);
+        
+            //{e,n} - public key
+            //{d,n} - private key
+
+            var D = "4E636AF98E40F3ADCFCCB698F4E80B9F";
+            var PS = GetRandomHexNumber(128 - 16 - 3);
+            var EB = $"0002{PS}00{D}";
+            var m = BigInteger.Parse(EB, System.Globalization.NumberStyles.AllowHexSpecifier);
+            var c = ModularPower(m, e, n);
+            var OB = c.ToString("X"); // encrypted session key
+
+            var mes = "Hello world!";
+            byte[] ba = Encoding.Default.GetBytes(mes);
+            var hexstring = BitConverter.ToString(ba).Replace("-", "");
+
+            var K = "5732164B3ABB6C4969ABA381C1CA75BA";
+            var byteKey = Enumerable.Range(0, D.Length / 2).Select(x => Convert.ToByte(D.Substring(x * 2, 2), 16)).ToArray();
+            var byteIV = Enumerable.Range(0, K.Length / 2).Select(x => Convert.ToByte(K.Substring(x * 2, 2), 16)).ToArray();
+
+            var decrSessionKey = ModularPower(c, d, n);
+            var parts = decrSessionKey.ToString("X2").Split(new string[] { "00" }, StringSplitOptions.None);
+            var byteSession = Enumerable.Range(0, parts.Last().Length / 2).Select(x => Convert.ToByte(parts.Last().Substring(x * 2, 2), 16)).ToArray();
+            var encr = Encrypt(mes, byteSession, byteIV);
+
+            var decr = Decrypt(encr, byteKey, byteIV);
         }
 
         private BigInteger GetRandomPrime()
@@ -180,6 +204,7 @@ namespace RSA
 
         private BigInteger ExtendedEuclidianAlgorithm(BigInteger a, BigInteger b, out BigInteger x, out BigInteger y)
         {
+            var n = b;
             x = -1; y = -1;
 
             if (b == 0)
@@ -188,16 +213,87 @@ namespace RSA
                 return a;
             }
 
-            int x1 = 0, x2 = 1,
+            BigInteger x1 = 0, x2 = 1,
                 y1 = 1, y2 = 0;
 
             while(b > 0)
             {
-                var q = Math.Floor(Convert.ToDecimal(a / b));
+                var q = BigInteger.Divide(a, b);
+                var r = a - q * b;
+                x = x2 - q * x1;
+                y = y2 - q * y1;
 
+                a = b; b = r;
+                x2 = x1; x1 = x;
+                y2 = y1; y1 = y;
             }
 
-            return 0;
+            x = x2 > 0 ? x2 : x2 + n; y = y2; // d = a
+            return a;
+        }
+
+        private static string GetRandomHexNumber(int bytes)
+        {
+            var random = new Random();
+            byte[] buffer = new byte[bytes];
+            random.NextBytes(buffer);
+            string result = String.Concat(buffer.Select(x => x.ToString("X2")).ToArray());
+            if (bytes % 2 == 0)
+                return result;
+            return result + random.Next(16).ToString("X");
+        }
+
+        static byte[] Encrypt(string plainText, byte[] Key, byte[] IV)
+        {
+            byte[] encrypted;
+            // Create a new AesManaged.    
+            using (AesManaged aes = new AesManaged())
+            {
+                // Create encryptor    
+                ICryptoTransform encryptor = aes.CreateEncryptor(Key, IV);
+                aes.Mode = CipherMode.CBC;
+
+                // Create MemoryStream    
+                using (MemoryStream ms = new MemoryStream())
+                {
+                    // Create crypto stream using the CryptoStream class. This class is the key to encryption    
+                    // and encrypts and decrypts data from any given stream. In this case, we will pass a memory stream    
+                    // to encrypt    
+                    using (CryptoStream cs = new CryptoStream(ms, encryptor, CryptoStreamMode.Write))
+                    {
+                        // Create StreamWriter and write data to a stream    
+                        using (StreamWriter sw = new StreamWriter(cs))
+                            sw.Write(plainText);
+                        encrypted = ms.ToArray();
+                    }
+                }
+            }
+            // Return encrypted data    
+            return encrypted;
+        }
+        static string Decrypt(byte[] cipherText, byte[] Key, byte[] IV)
+        {
+            string plaintext = null;
+            // Create AesManaged    
+            using (AesManaged aes = new AesManaged())
+            {
+                // Create a decryptor    
+                ICryptoTransform decryptor = aes.CreateDecryptor(Key, IV);
+                aes.Mode = CipherMode.CBC;
+
+                // Create the streams used for decryption.    
+                using (MemoryStream ms = new MemoryStream(cipherText))
+                {
+                    // Create crypto stream    
+                    using (CryptoStream cs = new CryptoStream(ms, decryptor, CryptoStreamMode.Read))
+                    {
+                        // Read crypto stream    
+                        using (StreamReader reader = new StreamReader(cs))
+                            plaintext = reader.ReadToEnd();
+                    }
+                }
+            }
+            return plaintext;
         }
     }
 }
